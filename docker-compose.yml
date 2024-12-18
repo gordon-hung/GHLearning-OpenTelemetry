@@ -1,0 +1,130 @@
+---
+version: '3.4'
+services:
+  app:
+    build:
+      context: "."
+      dockerfile: Dockerfile
+    container_name: sample-app
+    ports:
+    - 8080:8080
+    environment:
+    - ASPNETCORE_ENVIRONMENT=Production
+    - OTLP_ENDPOINT_URL=http://otel-collector:4317/
+    - SERVICE_NAME=OpenTelemetrySample-Api
+    depends_on:
+    - otel-collector
+    networks:
+    - sample-nat
+  seq:
+    image: datalust/seq:2024.3
+    container_name: sample-seq
+    environment:
+    - ACCEPT_EULA=Y
+    volumes:
+    - seq-data:/data
+    ports:
+    - 5341:5341
+    - 45341:45341
+    - 8081:80
+    networks:
+    - sample-nat
+    restart: always
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.114.0
+    container_name: sample-otel-collector
+    command:
+    - "--config=/etc/otel-collector-config.yaml"
+    volumes:
+    - "./OpenTelemetry/otel-collector-config.yaml:/etc/otel-collector-config.yaml:ro"
+    ports:
+    - 4317:4317
+    networks:
+    - sample-nat
+    restart: unless-stopped
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.16.1
+    container_name: sample-elasticsearch
+    environment:
+    - cluster.name=jaeger-cluster
+    - discovery.type=single-node
+    - http.host=0.0.0.0
+    - transport.host=127.0.0.1
+    - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    - xpack.security.enabled=false
+    volumes:
+    - elasticsearch-data:/usr/share/elasticsearch/data
+    ports:
+    - 9200:9200
+    - ":9300:9300"
+    networks:
+    - sample-nat
+    restart: on-failure
+  jaeger-collector:
+    image: jaegertracing/jaeger-collector:1.63.0
+    container_name: sample-jaeger-collector
+    environment:
+    - SPAN_STORAGE_TYPE=elasticsearch
+    command:
+    - "--es.server-urls=http://elasticsearch:9200"
+    - "--es.num-shards=1"
+    - "--es.num-replicas=0"
+    - "--log-level=error"
+    ports:
+    - 14269:14269
+    - 14268:14268
+    - 14267:14267
+    - 14250:14250
+    - 9411:9411
+    depends_on:
+    - elasticsearch
+    networks:
+    - sample-nat
+    restart: on-failure
+  jaeger-query:
+    image: jaegertracing/jaeger-query:1.63.0
+    container_name: sample-jaeger-query
+    environment:
+    - SPAN_STORAGE_TYPE=elasticsearch
+    - no_proxy=localhost
+    command:
+    - "--es.server-urls=http://elasticsearch:9200"
+    - "--span-storage.type=elasticsearch"
+    - "--log-level=debug"
+    ports:
+    - 16686:16686
+    - 16687:16687
+    depends_on:
+    - jaeger-collector
+    networks:
+    - sample-nat
+    restart: on-failure
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.16.1
+    container_name: sample-kibana
+    environment:
+    - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    - TELEMETRY_ENABLED=false
+    ports:
+    - 5601:5601
+    depends_on:
+    - elasticsearch
+    networks:
+    - sample-nat
+    restart: on-failure
+  prometheus:
+    image: prom/prometheus:v3.0.1
+    container_name: sample-prometheus
+    volumes:
+    - "./Prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro"
+    ports:
+    - 9090:9090
+    networks:
+    - sample-nat
+    restart: unless-stopped
+volumes:
+  elasticsearch-data: 
+  seq-data: 
+networks:
+  sample-nat:
+    driver: bridge
