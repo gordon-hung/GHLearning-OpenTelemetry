@@ -9,7 +9,7 @@ services:
     ports:
     - 8080:8080
     environment:
-    - ASPNETCORE_ENVIRONMENT=Production
+    - ASPNETCORE_ENVIRONMENT=Development
     - OTLP_ENDPOINT_URL=http://otel-collector:4317/
     - SERVICE_NAME=OpenTelemetrySample-Api
     depends_on:
