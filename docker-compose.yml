@@ -6,125 +6,233 @@ services:
       context: "."
       dockerfile: Dockerfile
     container_name: sample-app
-    ports:
-    - 8080:8080
     environment:
-    - ASPNETCORE_ENVIRONMENT=Development
-    - OTLP_ENDPOINT_URL=http://otel-collector:4317/
-    - SERVICE_NAME=OpenTelemetrySample-Api
-    depends_on:
-    - otel-collector
+        - ASPNETCORE_ENVIRONMENT=Development
+        - OTLP_ENDPOINT_URL=http://otel-collector:4317/
+        - SERVICE_NAME=OpenTelemetrySample-Api
+    ports:
+        - 8080:8080
     networks:
-    - sample-nat
+        - sample-nat
+    depends_on:
+        - otel-collector
+
   seq:
     image: datalust/seq:2024.3
     container_name: sample-seq
     environment:
-    - ACCEPT_EULA=Y
+        - ACCEPT_EULA=Y
     volumes:
-    - seq-data:/data
+        - seq-data:/data
     ports:
-    - 5341:5341
-    - 45341:45341
-    - 8081:80
+        - "5341:5341"
+        - "45341:45341"
+        - "8081:80"
     networks:
-    - sample-nat
+        - sample-nat
     restart: always
+
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.114.0
     container_name: sample-otel-collector
-    command:
-    - "--config=/etc/otel-collector-config.yaml"
+    command: ["--config=/etc/otel-collector-config.yaml"]
     volumes:
-    - "./OpenTelemetry/otel-collector-config.yaml:/etc/otel-collector-config.yaml:ro"
+        - ./otel-collector/otel-collector-config.yaml:/etc/otel-collector-config.yaml:ro
     ports:
-    - 4317:4317
+        - "4317:4317" # OTLP gRPC receiver
     networks:
-    - sample-nat
+        - sample-nat
     restart: unless-stopped
+
+  fluentbit:
+    image: fluent/fluent-bit:3.2.10
+    container_name: sample-fluentbit
+    volumes:
+        - ./Fluent-Bit:/fluent-bit/etc
+    ports:
+        - "4318:4318" # OTLP gRPC receiver
+    networks:
+        - sample-nat
+    depends_on:
+        - otel-collector
+    restart: unless-stopped
+
+  loki:
+    image: grafana/loki:latest
+    container_name: sample-loki
+    command: -config.file=/etc/loki/local-config.yaml
+    ports:
+        - "3100:3100"
+    networks:
+        - sample-nat
+    depends_on:
+        - otel-collector
+    restart: unless-stopped
+
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.16.1
     container_name: sample-elasticsearch
     environment:
-    - cluster.name=jaeger-cluster
-    - discovery.type=single-node
-    - http.host=0.0.0.0
-    - transport.host=127.0.0.1
-    - ES_JAVA_OPTS=-Xms512m -Xmx512m
-    - xpack.security.enabled=false
+        - cluster.name=jaeger-cluster
+        - discovery.type=single-node
+        - http.host=0.0.0.0
+        - transport.host=127.0.0.1
+        - ES_JAVA_OPTS=-Xms512m -Xmx512m
+        - xpack.security.enabled=false
     volumes:
-    - elasticsearch-data:/usr/share/elasticsearch/data
+        - elasticsearch-data:/usr/share/elasticsearch/data
     ports:
-    - 9200:9200
-    - ":9300:9300"
+        - "9200:9200"
+        - "9300:9300"
     networks:
-    - sample-nat
+        - sample-nat
     restart: on-failure
+
   jaeger-collector:
     image: jaegertracing/jaeger-collector:1.63.0
     container_name: sample-jaeger-collector
     environment:
-    - SPAN_STORAGE_TYPE=elasticsearch
-    command:
-    - "--es.server-urls=http://elasticsearch:9200"
-    - "--es.num-shards=1"
-    - "--es.num-replicas=0"
-    - "--log-level=error"
+      - SPAN_STORAGE_TYPE=elasticsearch
+    command: [
+      "--es.server-urls=http://elasticsearch:9200",
+      "--es.num-shards=1",
+      "--es.num-replicas=0",
+      "--log-level=error"
+    ]
     ports:
-    - 14269:14269
-    - 14268:14268
-    - 14267:14267
-    - 14250:14250
-    - 9411:9411
-    depends_on:
-    - elasticsearch
+        - "14269:14269"
+        - "14268:14268"
+        - "14267:14267"
+        - "14250:14250"
+        - "9411:9411"
     networks:
-    - sample-nat
+        - sample-nat
+    depends_on:
+        - elasticsearch
     restart: on-failure
+    
   jaeger-query:
     image: jaegertracing/jaeger-query:1.63.0
     container_name: sample-jaeger-query
     environment:
-    - SPAN_STORAGE_TYPE=elasticsearch
-    - no_proxy=localhost
-    command:
-    - "--es.server-urls=http://elasticsearch:9200"
-    - "--span-storage.type=elasticsearch"
-    - "--log-level=debug"
+      - SPAN_STORAGE_TYPE=elasticsearch
+      - no_proxy=localhost
+    command: [
+      "--es.server-urls=http://elasticsearch:9200",
+      "--span-storage.type=elasticsearch",
+      "--log-level=debug"
+    ]
     ports:
-    - 16686:16686
-    - 16687:16687
-    depends_on:
-    - jaeger-collector
+      - "16686:16686"
+      - "16687:16687"
     networks:
-    - sample-nat
+        - sample-nat
+    depends_on:
+        - jaeger-collector
     restart: on-failure
+    
   kibana:
     image: docker.elastic.co/kibana/kibana:8.16.1
     container_name: sample-kibana
     environment:
-    - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
-    - TELEMETRY_ENABLED=false
+      # remember the container_name for elasticsearch?
+      # we use it here to access that container
+        - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      # Change this to true if you want to sent
+      # telemetry data to kibana developers
+        - TELEMETRY_ENABLED=false
     ports:
-    - 5601:5601
+        - 5601:5601
     depends_on:
-    - elasticsearch
+        - elasticsearch
     networks:
-    - sample-nat
+        - sample-nat
     restart: on-failure
+    
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: sample-cadvisor
+    volumes: 
+        - "/:/rootfs"
+        - "/var/run:/var/run"
+        - "/sys:/sys"
+        - "/var/lib/docker/:/var/lib/docker"
+        - "/dev/disk/:/dev/disk"
+    privileged: true
+    devices: 
+        - "/dev/kmsg"
+    ports:
+        - "8090:8080"
+    networks:
+        - sample-nat
+    restart: unless-stopped  
+    
+  node-exporter:
+    image: prom/node-exporter:v1.9.0
+    container_name: sample-node-exporter
+    command:
+        - '--path.procfs=/host/proc'
+        - '--path.rootfs=/rootfs'
+        - '--path.sysfs=/host/sys'
+        - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+        - '--no-collector.arp'
+        - '--no-collector.netstat'
+        - '--no-collector.netdev'
+        - '--no-collector.softnet'
+    volumes:
+        - /proc:/host/proc:ro
+        - /sys:/host/sys:ro
+        - /:/rootfs:ro
+    ports:
+        - 9100:9100
+    networks:
+        - sample-nat
+    restart: unless-stopped  
+        
   prometheus:
     image: prom/prometheus:v3.0.1
     container_name: sample-prometheus
     volumes:
-    - "./Prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro"
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
     ports:
-    - 9090:9090
+      - "9090:9090"
     networks:
-    - sample-nat
+        - sample-nat
+    restart: unless-stopped  
+    
+  grafana:
+    image: grafana/grafana-oss:11.3.1
+    container_name: sample-grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: 1qaz2wsx
+    volumes:
+        - grafana-data:/var/lib/grafana
+        - ./grafana/dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yaml
+        - ./grafana/datasources.yml:/etc/grafana/provisioning/datasources/prometheus.yaml
+        - ./grafana/dashboards:/dashboards
+    ports:
+        - "3000:3000"
+    networks:
+        - sample-nat
     restart: unless-stopped
+    
+  gatus:
+    image: docker.io/twinproduction/gatus:v5.17.0
+    container_name: sample-gatus
+    user: '999:999'
+    volumes:
+      - ./gatus/config.yaml:/config/config.yaml:ro
+    ports:
+      - "8088:8080"
+    networks:
+        - sample-nat
+    restart: unless-stopped
+    
 volumes:
-  elasticsearch-data: 
-  seq-data: 
+  elasticsearch-data:
+  seq-data:
+  grafana-data:
 networks:
   sample-nat:
     driver: bridge

@@ -1,0 +1,8 @@
+endpoints:
+  - name: app-api
+    group: app
+    url: "http://app:8080/healthz"
+    interval: 10s
+    conditions:
+      - "[STATUS] == 200"
+      - "[RESPONSE_TIME] < 150"

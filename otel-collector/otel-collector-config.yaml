@@ -1,0 +1,58 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+  fluentforward:
+    endpoint: 0.0.0.0:24224
+
+exporters:
+  prometheus:
+    endpoint: "0.0.0.0:9090"
+    const_labels:
+      label1: value1
+  otlp:
+    endpoint: jaeger-collector:4317
+    tls:
+      insecure: true
+  otlphttp/sep:
+    endpoint: "http://seq:5341/ingest/otlp/"
+    headers:
+      api-key: "X-Seq-ApiKey: p6FrUTYwLz6qakVqRctT"
+    tls:
+      insecure: true
+  otlphttp/loki:
+    endpoint: "http://loki:3100/otlp/"
+    tls:
+      insecure: true
+  elasticsearch:
+    endpoint: "http://elasticsearch:9200"
+    index: "otel-logs"
+  otlphttp/fluentd:
+    endpoint: "http://fluentbit:4318"  # Fluent Bit 的接收端口
+    timeout: 10s
+processors:
+  batch:
+
+extensions:
+  health_check:
+  pprof:
+    endpoint: :1888
+
+service:
+  extensions: [pprof,  health_check]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlp]
+    metrics:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [ prometheus]
+    logs:
+     receivers: [otlp,fluentforward]
+     processors: [batch]
+     exporters: [otlphttp/sep,otlphttp/loki,otlphttp/fluentd]
