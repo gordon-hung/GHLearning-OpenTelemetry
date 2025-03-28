@@ -3,7 +3,7 @@
 OpenTelemetry is a collection of APIs, SDKs, and tools. Use it to instrument, generate, collect, and export telemetry data (metrics, logs, and traces) to help you analyze your software’s performance and behavior.
 
 ## OpenTelemetry Infrastructure
-![image](https://github.com/gordon-hung/opentelemetry-sample/blob/master/Images/Opentelemetry.png)
+![image](https://github.com/gordon-hung/opentelemetry-sample/blob/master/Images/OpenTelemetry.png)
 ## Docker
 ```sh
 docker-compose up -d --build 
