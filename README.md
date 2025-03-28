@@ -26,8 +26,26 @@ http://localhost:5601/
 ```
 ![image](https://github.com/gordon-hung/opentelemetry-sample/blob/master/Images/Kibana.png)
 
-### Kibana
+### Seq
 ```sh
 http://localhost:8081/
 ```
 ![image](https://github.com/gordon-hung/opentelemetry-sample/blob/master/Images/Seq.png)
+
+### Loki
+```sh
+http://localhost:3000/
+```
+![image](https://github.com/gordon-hung/opentelemetry-sample/blob/master/Images/Loki.png)
+
+### Cadvisor
+```sh
+http://localhost:8090/
+```
+![image](https://github.com/gordon-hung/opentelemetry-sample/blob/master/Images/Cadvisor.png)
+
+### Gatus
+```sh
+http://localhost:8088/
+```
+![image](https://github.com/gordon-hung/opentelemetry-sample/blob/master/Images/Gatus.png)
