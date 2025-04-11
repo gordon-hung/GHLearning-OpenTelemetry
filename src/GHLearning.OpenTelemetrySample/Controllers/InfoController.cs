@@ -3,7 +3,7 @@ using System.Net.Sockets;
 using System.Reflection;
 using Microsoft.AspNetCore.Mvc;
 
-namespace OpenTelemetrySample.AppHost.Controllers;
+namespace GHLearning.OpenTelemetrySample.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
@@ -37,8 +37,8 @@ public class InfoController : ControllerBase
 			AspnetcoreHttpsPorts = configuration["ASPNETCORE_HTTPS_PORTS"],
 			AspnetcoreHttpPorts = configuration["ASPNETCORE_HTTP_PORTS"],
 			AspnetcoreEnvironment = configuration["ASPNETCORE_ENVIRONMENT"],
-			OtlpEndpointUrl = configuration["OTLP_ENDPOINT_URL"],
-			ServiceName = configuration["SERVICE_NAME"]
+			OtlpEndpointUrl = configuration.GetValue<string>("OtlpEndpointUrl"),
+			ServiceName = configuration.GetValue<string>("ServiceName")
 		};
 	}
 }

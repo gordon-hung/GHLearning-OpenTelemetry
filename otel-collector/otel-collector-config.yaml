@@ -5,34 +5,47 @@ receivers:
         endpoint: 0.0.0.0:4317
       http:
         endpoint: 0.0.0.0:4318
+
   fluentforward:
     endpoint: 0.0.0.0:24224
 
+  prometheus/otelcol:
+    config:
+      scrape_configs:
+        - job_name: 'otelcol'
+          scrape_interval: 10s
+          static_configs:
+            - targets: ['0.0.0.0:8888']
+
 exporters:
   prometheus:
-    endpoint: "0.0.0.0:9090"
+    endpoint: 0.0.0.0:8889
     const_labels:
       label1: value1
+
   otlp:
     endpoint: jaeger-collector:4317
     tls:
       insecure: true
+
   otlphttp/sep:
     endpoint: "http://seq:5341/ingest/otlp/"
-    headers:
-      api-key: "X-Seq-ApiKey: p6FrUTYwLz6qakVqRctT"
     tls:
       insecure: true
+
   otlphttp/loki:
     endpoint: "http://loki:3100/otlp/"
     tls:
       insecure: true
+
   elasticsearch:
     endpoint: "http://elasticsearch:9200"
     index: "otel-logs"
+    
   otlphttp/fluentd:
     endpoint: "http://fluentbit:4318"  # Fluent Bit 的接收端口
     timeout: 10s
+
 processors:
   batch:
 
@@ -43,15 +56,18 @@ extensions:
 
 service:
   extensions: [pprof,  health_check]
+  telemetry:
+    metrics:
+      address: 0.0.0.0:8888
   pipelines:
     traces:
       receivers: [otlp]
       processors: [batch]
       exporters: [otlp]
     metrics:
-      receivers: [otlp]
+      receivers: [prometheus/otelcol,otlp]
       processors: [batch]
-      exporters: [ prometheus]
+      exporters: [prometheus]
     logs:
      receivers: [otlp,fluentforward]
      processors: [batch]

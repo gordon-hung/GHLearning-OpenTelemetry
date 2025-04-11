@@ -1,4 +1,4 @@
-﻿namespace OpenTelemetrySample.AppHost;
+﻿namespace GHLearning.OpenTelemetrySample;
 
 public class WeatherForecast
 {

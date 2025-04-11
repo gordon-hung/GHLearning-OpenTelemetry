@@ -1,6 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 
-namespace OpenTelemetrySample.AppHost.Controllers;
+namespace GHLearning.OpenTelemetrySample.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
