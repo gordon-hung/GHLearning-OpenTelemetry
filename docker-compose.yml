@@ -1,23 +1,22 @@
 ---
-version: '3.4'
 services:
   app:
     build:
       context: "."
       dockerfile: Dockerfile
-    container_name: sample-app
+    container_name: otel-app
     environment:
         - ASPNETCORE_ENVIRONMENT=Production
     ports:
         - 8080:8080
     networks:
-        - sample-nat
+        - otel-nat
     depends_on:
-        - otel-collector
+        - opentelemetry-collector
 
   seq:
     image: datalust/seq:2024.3
-    container_name: sample-seq
+    container_name: otel-seq
     environment:
         - ACCEPT_EULA=Y
     volumes:
@@ -27,51 +26,65 @@ services:
         - "45341:45341"
         - "8081:80"
     networks:
-        - sample-nat
+        - otel-nat
     restart: always
 
-  otel-collector:
+  opentelemetry-collector:
     image: otel/opentelemetry-collector-contrib:0.114.0
-    container_name: sample-otel-collector
-    command: ["--config=/etc/otel-collector-config.yaml"]
+    container_name: otel-opentelemetry-collector
     volumes:
-        - ./otel-collector/otel-collector-config.yaml:/etc/otel-collector-config.yaml:ro
+        - ./otel-collector/otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml:ro
     ports:
         - "4317:4317" # OTLP gRPC receiver
         - "8888:8888" # internal metrics
         - "8889:8889" # OTLP metrics
     networks:
-        - sample-nat
+        - otel-nat
     restart: unless-stopped
 
   fluentbit:
     image: fluent/fluent-bit:3.2.10
-    container_name: sample-fluentbit
+    container_name: otel-fluentbit
     volumes:
         - ./Fluent-Bit:/fluent-bit/etc
     ports:
         - "4318:4318" # OTLP gRPC receiver
     networks:
-        - sample-nat
+        - otel-nat
     depends_on:
-        - otel-collector
+        - opentelemetry-collector
     restart: unless-stopped
 
   loki:
     image: grafana/loki:latest
-    container_name: sample-loki
+    container_name: otel-loki
     command: -config.file=/etc/loki/local-config.yaml
     ports:
         - "3100:3100"
     networks:
-        - sample-nat
+        - otel-nat
     depends_on:
-        - otel-collector
+        - opentelemetry-collector
+    restart: unless-stopped
+    
+  tempo:
+    image: grafana/tempo:main-d528a28
+    container_name: otel-tempo
+    command: [ "-config.file=/etc/tempo.yaml" ]
+    volumes:
+      - ./tempo/tempo.yaml:/etc/tempo.yaml
+      - tempo-data:/tmp/tempo
+    ports:
+      - "3200:3200"   # tempo
+    networks:
+        - otel-nat
+    depends_on:
+        - opentelemetry-collector
     restart: unless-stopped
 
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.16.1
-    container_name: sample-elasticsearch
+    container_name: otel-elasticsearch
     environment:
         - cluster.name=jaeger-cluster
         - discovery.type=single-node
@@ -85,12 +98,12 @@ services:
         - "9200:9200"
         - "9300:9300"
     networks:
-        - sample-nat
+        - otel-nat
     restart: on-failure
 
   jaeger-collector:
     image: jaegertracing/jaeger-collector:1.63.0
-    container_name: sample-jaeger-collector
+    container_name: otel-jaeger-collector
     environment:
       - SPAN_STORAGE_TYPE=elasticsearch
     command: [
@@ -106,14 +119,14 @@ services:
         - "14250:14250"
         - "9411:9411"
     networks:
-        - sample-nat
+        - otel-nat
     depends_on:
         - elasticsearch
     restart: on-failure
     
   jaeger-query:
     image: jaegertracing/jaeger-query:1.63.0
-    container_name: sample-jaeger-query
+    container_name: otel-jaeger-query
     environment:
       - SPAN_STORAGE_TYPE=elasticsearch
       - no_proxy=localhost
@@ -126,14 +139,14 @@ services:
       - "16686:16686"
       - "16687:16687"
     networks:
-        - sample-nat
+        - otel-nat
     depends_on:
         - jaeger-collector
     restart: on-failure
     
   kibana:
     image: docker.elastic.co/kibana/kibana:8.16.1
-    container_name: sample-kibana
+    container_name: otel-kibana
     environment:
       # remember the container_name for elasticsearch?
       # we use it here to access that container
@@ -146,12 +159,12 @@ services:
     depends_on:
         - elasticsearch
     networks:
-        - sample-nat
+        - otel-nat
     restart: on-failure
     
   cadvisor:
     image: gcr.io/cadvisor/cadvisor:latest
-    container_name: sample-cadvisor
+    container_name: otel-cadvisor
     volumes: 
         - "/:/rootfs"
         - "/var/run:/var/run"
@@ -164,12 +177,12 @@ services:
     ports:
         - "8090:8080"
     networks:
-        - sample-nat
+        - otel-nat
     restart: unless-stopped  
     
   node-exporter:
     image: prom/node-exporter:v1.9.0
-    container_name: sample-node-exporter
+    container_name: otel-node-exporter
     command:
         - '--path.procfs=/host/proc'
         - '--path.rootfs=/rootfs'
@@ -186,23 +199,24 @@ services:
     ports:
         - 9100:9100
     networks:
-        - sample-nat
+        - otel-nat
     restart: unless-stopped  
         
   prometheus:
     image: prom/prometheus:v3.0.1
-    container_name: sample-prometheus
+    container_name: otel-prometheus
     volumes:
-      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+        - "./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro"
+        - prometheus-data:/prometheus
     ports:
       - "9090:9090"
     networks:
-        - sample-nat
+        - otel-nat
     restart: unless-stopped  
     
   grafana:
     image: grafana/grafana-oss:11.3.1
-    container_name: sample-grafana
+    container_name: otel-grafana
     environment:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: 1qaz2wsx
@@ -214,25 +228,28 @@ services:
     ports:
         - "3000:3000"
     networks:
-        - sample-nat
+        - otel-nat
     restart: unless-stopped
     
   gatus:
     image: docker.io/twinproduction/gatus:v5.17.0
-    container_name: sample-gatus
+    container_name: otel-gatus
     user: '999:999'
     volumes:
       - ./gatus/config.yaml:/config/config.yaml:ro
     ports:
       - "8088:8080"
     networks:
-        - sample-nat
+        - otel-nat
     restart: unless-stopped
     
 volumes:
   elasticsearch-data:
   seq-data:
   grafana-data:
+  uptime-kuma-data:
+  tempo-data:
+  prometheus-data:
 networks:
-  sample-nat:
+  otel-nat:
     driver: bridge
