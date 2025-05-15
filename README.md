@@ -1,5 +1,5 @@
 # GHLearning-OpenTelemetry
-Gordon Hung Learning OpenTelemetry
+[![GitHub Actions GHLearning-OpenTelemetry](https://github.com/gordon-hung/GHLearning-OpenTelemetry/actions/workflows/dotnet.yml/badge.svg)](https://github.com/gordon-hung/GHLearning-OpenTelemetry/actions/workflows/dotnet.yml) [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/gordon-hung/GHLearning-OpenTelemetry)
 
 OpenTelemetry is a collection of APIs, SDKs, and tools. Use it to instrument, generate, collect, and export telemetry data (metrics, logs, and traces) to help you analyze your software’s performance and behavior.
 
