@@ -1,5 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-
+using System.Text.Json;
 namespace GHLearning.OpenTelemetrySample.Controllers;
 
 [ApiController]
@@ -22,7 +22,7 @@ public class WeatherForecastController(
 			Summary = _Summaries[Random.Shared.Next(_Summaries.Length)]
 		})];
 
-		logger.LogInformation("Weather forecast generated: {WeatherForecasts}", weatherForecasts);
+		logger.LogInformation("Weather forecast generated: {WeatherForecasts}", JsonSerializer.Serialize(weatherForecasts));
 
 		return weatherForecasts;
 	}

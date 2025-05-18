@@ -6,7 +6,7 @@ services:
       dockerfile: Dockerfile
     container_name: otel-app
     environment:
-        - ASPNETCORE_ENVIRONMENT=Production
+        - ASPNETCORE_ENVIRONMENT=dev
     ports:
         - 8080:8080
     networks:
@@ -30,7 +30,7 @@ services:
     restart: always
 
   opentelemetry-collector:
-    image: otel/opentelemetry-collector-contrib:0.114.0
+    image: otel/opentelemetry-collector-contrib:0.117.0
     container_name: otel-opentelemetry-collector
     volumes:
         - ./otel-collector/otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml:ro

@@ -5,6 +5,8 @@ receivers:
         endpoint: 0.0.0.0:4317
       http:
         endpoint: 0.0.0.0:4318
+  fluentforward:
+    endpoint: 0.0.0.0:24224
   prometheus:
     config:
       scrape_configs:
@@ -15,17 +17,22 @@ receivers:
           - 0.0.0.0:8888
 exporters:
   debug:
+  elasticsearch:
+    endpoint: http://elasticsearch:9200
+    tls:
+      insecure: true
+    logs_index: ""
+    logs_dynamic_index:
+        enabled: true
+    logstash_format:
+        enabled: true
+        date_format: "%Y-%m-%d"
   otlp/jaeger:
     endpoint: jaeger-collector:4317
     tls:
       insecure: true
   otlp/tempo:
     endpoint: tempo:4317
-    tls:
-      insecure: true
-  elasticsearch:
-    endpoint: http://elasticsearch:9200
-    index: otel-logs
     tls:
       insecure: true
   otlphttp/seq:
@@ -47,11 +54,19 @@ extensions:
   zpages:
     endpoint: 0.0.0.0:55679
 processors:
-  batch: {}
+  batch:
+    timeout: 10s
+    send_batch_size: 10000
+    send_batch_max_size: 11000
   memory_limiter:
     check_interval: 5s
     limit_percentage: 80
     spike_limit_percentage: 25
+  resource:
+    attributes:
+      - action: upsert
+        key: "elasticsearch.index.prefix"
+        from_attribute: "service.name"
 service:
   telemetry:
     metrics:
@@ -69,19 +84,19 @@ service:
     logs:
       receivers:
       - otlp
+      - fluentforward
       processors:
       - memory_limiter
+      - resource
       - batch
       exporters:
-      - debug
-      - elasticsearch
       - otlphttp/seq
       - otlphttp/loki
       - otlphttp/fluentd
+      - elasticsearch
     metrics:
       receivers:
       - otlp
-      - prometheus
       processors:
       - memory_limiter
       - batch
@@ -94,6 +109,5 @@ service:
       - memory_limiter
       - batch
       exporters:
-      - debug
       - otlp/jaeger
       - otlp/tempo
