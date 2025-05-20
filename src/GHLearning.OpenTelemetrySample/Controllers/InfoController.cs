@@ -30,6 +30,7 @@ public class InfoController : ControllerBase
 			Environment.MachineName,
 			HostName = hostName,
 			HostIp = hostIp?.ToString() ?? string.Empty,
+			Application = hostingEnvironment.ApplicationName,
 			Environment = hostingEnvironment.EnvironmentName,
 			OsVersion = $"{Environment.OSVersion}",
 			Version = Assembly.GetExecutingAssembly().GetName().Version?.ToString(),

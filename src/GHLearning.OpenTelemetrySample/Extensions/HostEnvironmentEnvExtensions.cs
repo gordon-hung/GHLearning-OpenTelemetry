@@ -9,7 +9,6 @@ public static class HostEnvironmentEnvExtensions
 	/// <returns><see langword="true"/> if the environment name is <see cref="Environments.Development"/>, otherwise <see langword="false"/>.</returns>
 	public static bool IsDev(this IHostEnvironment hostEnvironment)
 	{
-
 		return hostEnvironment.IsEnvironment("dev");
 	}
 }

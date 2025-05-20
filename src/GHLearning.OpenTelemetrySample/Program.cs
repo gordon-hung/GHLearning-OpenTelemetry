@@ -6,7 +6,6 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using OpenTelemetry;
 using OpenTelemetry.Exporter;
-using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
@@ -40,27 +39,19 @@ builder.Services.AddHttpLogging(logging =>
 //Learn more about configuring OpenTelemetry at https://learn.microsoft.com/zh-tw/dotnet/core/diagnostics/observability-with-otel
 builder.Services.AddOpenTelemetry()
 	.ConfigureResource(resource => resource
-	.AddService(builder.Configuration["ServiceName"]!))
-	//.UseOtlpExporter(OtlpExportProtocol.Grpc, new Uri(builder.Configuration["OtlpEndpointUrl"]!))
+	.AddService(
+		serviceName: builder.Configuration["ServiceName"]!.ToLower(),
+		serviceNamespace: builder.Configuration["ServiceNamespace"]!,
+		serviceVersion: typeof(Program).Assembly.GetName().Version?.ToString() ?? "unknown")
+	)
+	.UseOtlpExporter(OtlpExportProtocol.Grpc, new Uri(builder.Configuration["OtlpEndpointUrl"]!))
 	.WithMetrics(metrics => metrics
-		.SetResourceBuilder(ResourceBuilder.CreateDefault().AddService(builder.Configuration["ServiceName"]!))
-		.AddOtlpExporter(builder.Configuration["ServiceName"]!, config =>
-		{
-			config.Endpoint = new Uri(builder.Configuration["OtlpEndpointUrl"]!);
-			config.Protocol = OtlpExportProtocol.Grpc;
-		})
 		.AddMeter("GHLearning.")
 		.AddAspNetCoreInstrumentation()
 		.AddRuntimeInstrumentation()
 		.AddProcessInstrumentation()
 		.AddPrometheusExporter())
 	.WithTracing(tracing => tracing
-		.SetResourceBuilder(ResourceBuilder.CreateDefault().AddService(builder.Configuration["ServiceName"]!))
-		.AddOtlpExporter(builder.Configuration["ServiceName"]!, config =>
-		{
-			config.Endpoint = new Uri(builder.Configuration["OtlpEndpointUrl"]!);
-			config.Protocol = OtlpExportProtocol.Grpc;
-		})
 		.AddEntityFrameworkCoreInstrumentation()
 		.AddHttpClientInstrumentation()
 		.AddAspNetCoreInstrumentation(options => options.Filter = (httpContext) =>
@@ -73,14 +64,7 @@ builder.Services.AddOpenTelemetry()
 				!httpContext.Request.Path.Value!.EndsWith(".js", StringComparison.OrdinalIgnoreCase) &&
 				!httpContext.Request.Path.StartsWithSegments("/_vs", StringComparison.OrdinalIgnoreCase) &&
 				!httpContext.Request.Path.StartsWithSegments("/openapi", StringComparison.OrdinalIgnoreCase) &&
-				!httpContext.Request.Path.StartsWithSegments("/scalar", StringComparison.OrdinalIgnoreCase)))
-	.WithLogging(logging => logging
-		.SetResourceBuilder(ResourceBuilder.CreateDefault().AddService(builder.Configuration["ServiceLogName"]!))
-		.AddOtlpExporter(builder.Configuration["ServiceLogName"]!, config =>
-		{
-			config.Endpoint = new Uri(builder.Configuration["OtlpEndpointUrl"]!);
-			config.Protocol = OtlpExportProtocol.Grpc;
-		}));
+				!httpContext.Request.Path.StartsWithSegments("/scalar", StringComparison.OrdinalIgnoreCase)));
 
 //Learn more about configuring HealthChecks at https://learn.microsoft.com/zh-tw/aspnet/core/host-and-deploy/health-checks?view=aspnetcore-9.0
 builder.Services.AddHealthChecks()
