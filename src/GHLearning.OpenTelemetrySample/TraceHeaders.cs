@@ -11,4 +11,3 @@ public static class TraceHeaders
 	public const string ParentId = "parent-id";
 	public const string TraceFlag = "trace-flags";
 }
-

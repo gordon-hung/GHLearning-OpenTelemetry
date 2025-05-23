@@ -1,12 +1,14 @@
 ﻿using System.Net.Mime;
 using System.Text.Json.Serialization;
+using CorrelationId;
+using CorrelationId.DependencyInjection;
 using GHLearning.OpenTelemetrySample;
+using GHLearning.OpenTelemetrySample.Correlations;
 using GHLearning.OpenTelemetrySample.Extensions;
 using GHLearning.OpenTelemetrySample.Middlewares;
 using Microsoft.AspNetCore.HttpLogging;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
-using Microsoft.Net.Http.Headers;
 using OpenTelemetry;
 using OpenTelemetry.Exporter;
 using OpenTelemetry.Metrics;
@@ -30,10 +32,19 @@ builder.Services
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
+//Learn more about configuring CorrelationId at https://github.com/stevejgordon/CorrelationId/wiki
+builder.Services.AddCorrelationId<CustomCorrelationIdProvider>(options =>
+{
+	options.AddToLoggingScope = true;
+	options.LoggingScopeKey = CorrelationIdOptions.DefaultHeader;
+});
+
 //Learn more about configuring HttpLogging at https://learn.microsoft.com/en-us/aspnet/core/fundamentals/http-logging/?view=aspnetcore-8.0
 builder.Services.AddHttpLogging(logging =>
 {
 	logging.LoggingFields = HttpLoggingFields.All;
+	logging.RequestHeaders.Add(CorrelationIdOptions.DefaultHeader);
+	logging.ResponseHeaders.Add(CorrelationIdOptions.DefaultHeader);
 	logging.RequestHeaders.Add(TraceHeaders.TraceParent);
 	logging.ResponseHeaders.Add(TraceHeaders.TraceParent);
 	logging.RequestHeaders.Add(TraceHeaders.TraceId);
@@ -52,9 +63,8 @@ builder.Services.AddOpenTelemetry()
 	.ConfigureResource(resource => resource
 	.AddService(
 		serviceName: builder.Configuration["ServiceName"]!.ToLower(),
-		serviceNamespace: builder.Configuration["ServiceNamespace"]!,
-		serviceVersion: typeof(Program).Assembly.GetName().Version?.ToString() ?? "unknown")
-	)
+		serviceNamespace: typeof(Program).Assembly.GetName().Name,
+		serviceVersion: typeof(Program).Assembly.GetName().Version?.ToString() ?? "unknown"))
 	.UseOtlpExporter(OtlpExportProtocol.Grpc, new Uri(builder.Configuration["OtlpEndpointUrl"]!))
 	.WithMetrics(metrics => metrics
 		.AddMeter("GHLearning.")
@@ -94,7 +104,11 @@ if (app.Environment.IsDevelopment() || app.Environment.IsDev())
 
 app.UseHttpLogging();
 
+app.UseCorrelationId();
+
 app.UseMiddleware<TraceMiddleware>();
+
+app.UseMiddleware<CorrelationMiddleware>();
 
 app.UseHttpsRedirection();
 
