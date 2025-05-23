@@ -1,9 +1,12 @@
 ﻿using System.Net.Mime;
 using System.Text.Json.Serialization;
+using GHLearning.OpenTelemetrySample;
 using GHLearning.OpenTelemetrySample.Extensions;
+using GHLearning.OpenTelemetrySample.Middlewares;
 using Microsoft.AspNetCore.HttpLogging;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.Net.Http.Headers;
 using OpenTelemetry;
 using OpenTelemetry.Exporter;
 using OpenTelemetry.Metrics;
@@ -31,6 +34,14 @@ builder.Services.AddOpenApi();
 builder.Services.AddHttpLogging(logging =>
 {
 	logging.LoggingFields = HttpLoggingFields.All;
+	logging.RequestHeaders.Add(TraceHeaders.TraceParent);
+	logging.ResponseHeaders.Add(TraceHeaders.TraceParent);
+	logging.RequestHeaders.Add(TraceHeaders.TraceId);
+	logging.ResponseHeaders.Add(TraceHeaders.TraceId);
+	logging.RequestHeaders.Add(TraceHeaders.ParentId);
+	logging.ResponseHeaders.Add(TraceHeaders.ParentId);
+	logging.RequestHeaders.Add(TraceHeaders.TraceFlag);
+	logging.ResponseHeaders.Add(TraceHeaders.TraceFlag);
 	logging.RequestBodyLogLimit = 4096;
 	logging.ResponseBodyLogLimit = 4096;
 	logging.CombineLogs = true;
@@ -81,9 +92,11 @@ if (app.Environment.IsDevelopment() || app.Environment.IsDev())
 	app.MapScalarApiReference();//scalar/v1
 }
 
-app.UseHttpsRedirection();
-
 app.UseHttpLogging();
+
+app.UseMiddleware<TraceMiddleware>();
+
+app.UseHttpsRedirection();
 
 app.UseAuthorization();
 
