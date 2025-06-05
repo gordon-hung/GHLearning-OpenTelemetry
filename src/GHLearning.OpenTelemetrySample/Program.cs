@@ -2,13 +2,13 @@
 using System.Text.Json.Serialization;
 using CorrelationId;
 using CorrelationId.DependencyInjection;
-using GHLearning.OpenTelemetrySample;
 using GHLearning.OpenTelemetrySample.Correlations;
 using GHLearning.OpenTelemetrySample.Extensions;
 using GHLearning.OpenTelemetrySample.Middlewares;
 using Microsoft.AspNetCore.HttpLogging;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.Net.Http.Headers;
 using OpenTelemetry;
 using OpenTelemetry.Exporter;
 using OpenTelemetry.Metrics;
@@ -45,14 +45,8 @@ builder.Services.AddHttpLogging(logging =>
 	logging.LoggingFields = HttpLoggingFields.All;
 	logging.RequestHeaders.Add(CorrelationIdOptions.DefaultHeader);
 	logging.ResponseHeaders.Add(CorrelationIdOptions.DefaultHeader);
-	logging.RequestHeaders.Add(TraceHeaders.TraceParent);
-	logging.ResponseHeaders.Add(TraceHeaders.TraceParent);
-	logging.RequestHeaders.Add(TraceHeaders.TraceId);
-	logging.ResponseHeaders.Add(TraceHeaders.TraceId);
-	logging.RequestHeaders.Add(TraceHeaders.ParentId);
-	logging.ResponseHeaders.Add(TraceHeaders.ParentId);
-	logging.RequestHeaders.Add(TraceHeaders.TraceFlag);
-	logging.ResponseHeaders.Add(TraceHeaders.TraceFlag);
+	logging.RequestHeaders.Add(HeaderNames.TraceParent);
+	logging.ResponseHeaders.Add(HeaderNames.TraceParent);
 	logging.RequestBodyLogLimit = 4096;
 	logging.ResponseBodyLogLimit = 4096;
 	logging.CombineLogs = true;
@@ -65,7 +59,7 @@ builder.Services.AddOpenTelemetry()
 		serviceName: builder.Configuration["ServiceName"]!.ToLower(),
 		serviceNamespace: typeof(Program).Assembly.GetName().Name,
 		serviceVersion: typeof(Program).Assembly.GetName().Version?.ToString() ?? "unknown"))
-	.UseOtlpExporter(OtlpExportProtocol.Grpc, new Uri(builder.Configuration["OtlpEndpointUrl"]!))
+	.UseOtlpExporter(OtlpExportProtocol.Grpc, new Uri(builder.Configuration["OtelExporterOtlpEndpoint"]!))
 	.WithMetrics(metrics => metrics
 		.AddMeter("GHLearning.")
 		.AddAspNetCoreInstrumentation()
@@ -101,6 +95,17 @@ if (app.Environment.IsDevelopment() || app.Environment.IsDev())
 	app.UseReDoc(options => options.SpecUrl("/openapi/v1.json"));//api-docs/
 	app.MapScalarApiReference();//scalar/v1
 }
+
+app.UseCors(policyBuilder =>
+{
+	policyBuilder.SetPreflightMaxAge(TimeSpan.FromDays(30))
+		.SetIsOriginAllowed((url) => true)
+		.AllowAnyHeader()
+		.AllowAnyMethod()
+		.AllowCredentials()
+		.WithExposedHeaders(CorrelationIdOptions.DefaultHeader)
+		.WithExposedHeaders(HeaderNames.TraceParent);
+});
 
 app.UseHttpLogging();
 

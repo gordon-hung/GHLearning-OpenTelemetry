@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics;
+using Microsoft.Net.Http.Headers;
 
 namespace GHLearning.OpenTelemetrySample.Middlewares;
 
@@ -14,10 +15,7 @@ public class TraceMiddleware(RequestDelegate next)
 
 		context.Response.OnStarting(() =>
 		{
-			context.Response.Headers[TraceHeaders.TraceParent] = traceParent;
-			context.Response.Headers[TraceHeaders.TraceId] = traceId;
-			context.Response.Headers[TraceHeaders.ParentId] = spanId;
-			context.Response.Headers[TraceHeaders.TraceFlag] = traceFlags;
+			context.Response.Headers[HeaderNames.TraceParent] = traceParent;
 			return Task.CompletedTask;
 		});
 
